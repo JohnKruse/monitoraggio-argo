@@ -31,7 +31,7 @@ from i18n import normalize_language
 from mailer import email_subject, read_manual_events, render_bacheca_email, render_daily_email, save_preview, send_html
 from settings import ConfigurationError, load_settings, resolve_path
 from storage import ArgoStore, stable_id
-from summarizer import summarize_bacheca
+from summarizer import DEFAULT_MODEL, summarize_bacheca
 
 
 def _token_args(config: dict[str, Any]) -> argparse.Namespace:
@@ -145,7 +145,7 @@ def run(config_path: Path, *, dry_run: bool = False, saved_export: Path | None =
         summary_config = settings.get("summaries") or {}
         summaries_enabled = bool(summary_config.get("enabled", True))
         summary_language = normalize_language(summary_config.get("language") or email_language)
-        summary_model = str(summary_config.get("model") or "gpt-5-mini")
+        summary_model = str(summary_config.get("model") or DEFAULT_MODEL)
         drive = DriveUploader(settings.get("google_drive") or {})
         keep_local = bool(storage_config.get("keep_local_documents", False))
         documents_dir = resolve_path(settings, storage_config.get("documents_dir") or "data/documents")

@@ -14,6 +14,7 @@ from i18n import normalize_language
 
 
 RESPONSES_URL = "https://api.openai.com/v1/responses"
+DEFAULT_MODEL = "gpt-5.6-luna"
 
 
 class SummaryError(RuntimeError):
@@ -35,7 +36,7 @@ def summarize_bacheca(
     author: str = "",
     files: list[Path] | None = None,
     language: str = "it",
-    model: str = "gpt-5-mini",
+    model: str = DEFAULT_MODEL,
     api_key: str | None = None,
 ) -> dict[str, str]:
     key = api_key or os.environ.get("OPENAI_API_KEY")

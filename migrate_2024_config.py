@@ -56,7 +56,7 @@ def migrate(source: Path, destination: Path) -> None:
         "summaries": {
             "enabled": True,
             "language": "en",
-            "model": "gpt-5-mini",
+            "model": "gpt-5.6-luna",
         },
         "files": {
             "schedule": "data/schedule.csv",
