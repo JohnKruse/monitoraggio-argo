@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a minimal private config.yaml from the 2024 project's JSON config."""
+"""Crea un config.yaml privato e minimale dalla configurazione JSON del progetto 2024."""
 
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ def migrate(source: Path, destination: Path) -> None:
             "days_forward": old.get("days_forward", 17),
             "max_daily_items": old.get("max_assignments", 12),
             "bacheca_recent_items": 10,
-            "bacheca_weekly_day": "sunday",
+            "bacheca_weekly_day": "domenica",
             "send_daily": True,
             "send_bacheca": True,
         },
@@ -74,7 +74,7 @@ def main() -> int:
     parser.add_argument("destination", type=Path, nargs="?", default=Path("config.yaml"))
     args = parser.parse_args()
     migrate(args.source, args.destination)
-    print(f"Private configuration written to {args.destination}; Git will ignore it.")
+    print(f"Configurazione privata salvata in {args.destination}; Git la ignorerà.")
     return 0
 
 

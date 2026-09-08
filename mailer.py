@@ -1,4 +1,4 @@
-"""HTML email rendering and SMTP delivery."""
+"""Generazione delle email HTML e invio tramite SMTP."""
 
 from __future__ import annotations
 
@@ -22,6 +22,17 @@ th,td{padding:9px;border:1px solid #d8e2ec;vertical-align:top}tr:nth-child(even)
 .important{color:#b42318;font-weight:bold}.muted{color:#667085}.new{border-left:5px solid #ef6a52}
 a{color:#1266a8}.footer{font-size:12px;color:#667085;margin-top:28px}
 """
+
+GIORNI = ("lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica")
+MESI = (
+    "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
+    "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre",
+)
+
+
+def data_italiana(value: date, con_giorno: bool = False) -> str:
+    giorno = f"{GIORNI[value.weekday()]}, " if con_giorno else ""
+    return f"{giorno}{value.day} {MESI[value.month - 1]} {value.year}"
 
 
 def _table(headers: list[str], rows: Iterable[Iterable[Any]]) -> str:
@@ -67,17 +78,17 @@ def render_daily_email(
     for item in homework:
         text = str(item.get("compito") or "")
         subject = str(item.get("materia") or "")
-        flag = "IMPORTANT" if any(word in f"{subject} {text}".lower() for word in important_words) else ""
+        flag = "IMPORTANTE" if any(word in f"{subject} {text}".lower() for word in important_words) else ""
         items.append((str(item.get("dataConsegna") or "")[:10], subject, text, flag))
     for item in reminders:
         text = str(item.get("desAnnotazioni") or item.get("annotazione") or item.get("descrizione") or "")
-        subject = str(item.get("materia") or "Reminder")
+        subject = str(item.get("materia") or "Promemoria")
         items.append((str(item.get("datGiorno") or "")[:10], subject, text, ""))
     for item in manual_events:
-        items.append((item.get("Date", ""), item.get("Subject", "Manual event"), item.get("Assignment", ""), item.get("Important", "")))
+        items.append((item.get("Date", ""), item.get("Subject", "Evento manuale"), item.get("Assignment", ""), item.get("Important", "")))
     items.sort(key=lambda row: (row[0], row[1], row[2]))
 
-    title = f"Upcoming schoolwork — {escape(label)}"
+    title = f"Prossimi impegni scolastici — {escape(label)}"
     sections = [f"<h1>{title}</h1>"]
     if items:
         rows = []
@@ -86,58 +97,58 @@ def render_daily_email(
             shown_date = due if due != last_date else ""
             rows.append((shown_date, subject, text, flag))
             last_date = due
-        sections.append(_table(["Date", "Subject", "Assignment / event", ""], rows))
+        sections.append(_table(["Data", "Materia", "Compito / evento", ""], rows))
     else:
-        sections.append("<p class='muted'>No upcoming assignments, reminders, or manual events.</p>")
+        sections.append("<p class='muted'>Nessun compito, promemoria o evento manuale in programma.</p>")
 
     if schedule_path and schedule_path.exists():
         with schedule_path.open(newline="", encoding="utf-8-sig") as handle:
             schedule = list(csv.reader(handle))
         if schedule:
             next_day = _next_school_day(today)
-            sections.append(f"<h2>Class schedule — {next_day.strftime('%A, %d %B %Y')}</h2>")
+            sections.append(f"<h2>Orario delle lezioni — {data_italiana(next_day, con_giorno=True)}</h2>")
             sections.append(_table(schedule[0], schedule[1:]))
     return _document("".join(sections))
 
 
 def render_bacheca_email(rows: list[dict[str, Any]], new_ids: set[str], today: date) -> str:
-    sections = [f"<h1>Argo Bacheca — {today.strftime('%d %B %Y')}</h1>"]
+    sections = [f"<h1>Bacheca Argo — {data_italiana(today)}</h1>"]
     for item in rows:
-        marker = " <span class='important'>NEW</span>" if item["id"] in new_ids else ""
-        sections.append(f"<div class='new'><h2>{escape(item.get('message') or 'Notice')}{marker}</h2>")
+        marker = " <span class='important'>NUOVO</span>" if item["id"] in new_ids else ""
+        sections.append(f"<div class='new'><h2>{escape(item.get('message') or 'Avviso')}{marker}</h2>")
         metadata = " · ".join(filter(None, [item.get("publish_date"), item.get("category"), item.get("author")]))
         sections.append(f"<p class='muted'>{escape(metadata)}</p>")
         links = []
         for attachment in item.get("attachments") or []:
             url = attachment.get("drive_url") or item.get("source_url")
-            name = escape(attachment.get("filename") or "Document")
+            name = escape(attachment.get("filename") or "Documento")
             links.append(f"<a href='{escape(url, quote=True)}'>{name}</a>" if url else name)
         if links:
-            sections.append("<p>Documents: " + " · ".join(links) + "</p>")
+            sections.append("<p>Documenti: " + " · ".join(links) + "</p>")
         sections.append("</div>")
     if not rows:
-        sections.append("<p class='muted'>No Bacheca notices are stored yet.</p>")
+        sections.append("<p class='muted'>Non è ancora presente alcun avviso della Bacheca.</p>")
     return _document("".join(sections))
 
 
 def _document(body: str) -> str:
-    return f"<html><head><style>{STYLE}</style></head><body><div class='wrap'><img class='header' src='cid:argo-header' alt='Argo monitoring header'>{body}<p class='footer'>Generated by Argo Monitoring.</p></div></body></html>"
+    return f"<html><head><style>{STYLE}</style></head><body><div class='wrap'><img class='header' src='cid:argo-header' alt='Intestazione Monitoraggio Argo'>{body}<p class='footer'>Generato da Monitoraggio Argo.</p></div></body></html>"
 
 
 def send_html(config: dict[str, Any], subject: str, html: str, audience: str, header_path: Path | None) -> int:
     test_mode = bool(config.get("test_mode", True))
     target = recipients(config.get("dev_recipients") if test_mode else config.get(f"{audience}_recipients"))
     if not target:
-        raise RuntimeError(f"No recipients configured for {audience} email")
+        raise RuntimeError(f"Nessun destinatario configurato per l'email {audience}")
     sender = str(config.get("sender") or "").strip()
     password = str(config.get("app_password") or "").strip()
     if not sender or not password:
-        raise RuntimeError("Email sender and app_password are required")
+        raise RuntimeError("Sono necessari il mittente e la password per app dell'email")
     message = EmailMessage()
-    message["Subject"] = ("[TEST] " if test_mode else "") + subject
+    message["Subject"] = ("[PROVA] " if test_mode else "") + subject
     message["From"] = sender
     message["To"] = ", ".join(target)
-    message.set_content("This message contains an HTML school monitoring report.")
+    message.set_content("Questo messaggio contiene un riepilogo scolastico in formato HTML.")
     message.add_alternative(html, subtype="html")
     if header_path and header_path.exists():
         html_part = message.get_payload()[-1]

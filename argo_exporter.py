@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Export future work and bulletin-board documents from Argo Famiglia.
+"""Esporta compiti futuri e documenti della Bacheca da Argo Famiglia.
 
-API-only mode accepts a current short-lived access token. Optional browser mode
-can obtain that token through Argo's own login page.
+La modalità API richiede un token di breve durata ancora valido. La modalità
+browser facoltativa può ottenerlo tramite la pagina di accesso di Argo.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ LOGIN_TIMEOUT_MS = 10 * 60 * 1000
 
 
 class ArgoError(RuntimeError):
-    """A user-facing Argo export error."""
+    """Errore di esportazione Argo destinato all'utente."""
 
 
 @dataclass(frozen=True)
@@ -113,17 +113,22 @@ def _browser_snapshot(
         from playwright.sync_api import sync_playwright
     except ImportError as exc:
         raise ArgoError(
-            "Playwright is not installed. Run: python3 -m pip install -r requirements.txt"
+            "Playwright non è installato. Esegui: python3 -m pip install -r requirements-browser.txt"
         ) from exc
 
     playwright = sync_playwright().start()
     try:
-        context = playwright.chromium.launch_persistent_context(
-            str(profile_dir), channel="chrome", headless=headless
-        )
+        try:
+            context = playwright.chromium.launch_persistent_context(
+                str(profile_dir), channel="chrome", headless=headless
+            )
+        except PlaywrightError:
+            context = playwright.chromium.launch_persistent_context(
+                str(profile_dir), headless=headless
+            )
         page = context.pages[0] if context.pages else context.new_page()
         if not headless:
-            print("A Chrome window has opened. Complete Argo login there if prompted.")
+            print("È stata aperta una finestra di Chrome. Se richiesto, completa lì l'accesso ad Argo.")
         page.goto(APP_URL, wait_until="domcontentloaded")
         page.wait_for_function(
             """
@@ -152,7 +157,7 @@ def _browser_snapshot(
                         remember.check()
                 page.locator("#accediBtn").click()
             except Exception as exc:
-                print(f"Automatic login was not completed ({exc}); please finish it in the browser.")
+                print(f"Accesso automatico non completato ({exc}); completalo nel browser.")
         try:
             page.wait_for_function(
                 """
@@ -168,7 +173,7 @@ def _browser_snapshot(
                 timeout=LOGIN_TIMEOUT_MS,
             )
         except PlaywrightTimeoutError as exc:
-            raise ArgoError("Timed out waiting for Argo login to finish.") from exc
+            raise ArgoError("Tempo scaduto durante l'attesa dell'accesso ad Argo.") from exc
 
         snapshot = page.evaluate(
             """
@@ -327,10 +332,10 @@ def _api_json(
         except Exception:
             message = None
         if exc.code in (401, 403):
-            raise ArgoError("The Argo access token is expired or unauthorized.") from exc
-        raise ArgoError(message or f"Argo API returned HTTP {exc.code} for {path}.") from exc
+            raise ArgoError("Il token di accesso Argo è scaduto o non autorizzato.") from exc
+        raise ArgoError(message or f"Le API Argo hanno restituito HTTP {exc.code} per {path}.") from exc
     if result.get("success") is False:
-        raise ArgoError(result.get("msg") or result.get("message") or f"Argo rejected {path}.")
+        raise ArgoError(result.get("msg") or result.get("message") or f"Argo ha rifiutato {path}.")
     return result
 
 
@@ -338,7 +343,7 @@ def _direct_snapshot(access_token: str) -> dict[str, Any]:
     login = _api_json(access_token, "/login", method="POST", body={})
     records = login.get("data") or []
     if not records:
-        raise ArgoError("Argo returned no student profiles.")
+        raise ArgoError("Argo non ha restituito alcun profilo studente.")
     profiles = []
     for index, record in enumerate(records):
         token = record.get("token")
@@ -350,7 +355,7 @@ def _direct_snapshot(access_token: str) -> dict[str, Any]:
         profile = profile_data.get("profilo") or profile_data
         start = (profile.get("anno") or {}).get("dataInizio")
         if not start:
-            raise ArgoError(f"Profile {index + 1} has no school-year start date.")
+            raise ArgoError(f"Il profilo {index + 1} non contiene la data di inizio dell'anno scolastico.")
         dashboard_response = _api_json(
             access_token,
             "/dashboard/dashboard",
@@ -386,13 +391,13 @@ def _token_from_har(path: Path) -> str:
         if payload.get("access_token"):
             candidates.append((entry.get("startedDateTime") or "", payload))
     if not candidates:
-        raise ArgoError("No OAuth access token was found in the HAR.")
+        raise ArgoError("Nel file HAR non è stato trovato alcun token di accesso OAuth.")
     started, payload = max(candidates, key=lambda item: item[0])
     if started and payload.get("expires_in"):
         issued = datetime.fromisoformat(started.replace("Z", "+00:00"))
         age = (datetime.now().astimezone() - issued).total_seconds()
         if age >= int(payload["expires_in"]):
-            raise ArgoError("The access token in this HAR has expired; capture a fresh login or paste a current token.")
+            raise ArgoError("Il token nel file HAR è scaduto; acquisisci un nuovo accesso o inserisci un token valido.")
     return str(payload["access_token"])
 
 
@@ -404,9 +409,9 @@ def _access_token(args: argparse.Namespace) -> str:
     else:
         token = os.environ.get("ARGO_ACCESS_TOKEN", "").strip()
     if not token:
-        token = getpass.getpass("Paste the current Argo access token: ").strip()
+        token = getpass.getpass("Incolla il token di accesso Argo attuale: ").strip()
     if not token:
-        raise ArgoError("No access token was supplied.")
+        raise ArgoError("Non è stato fornito alcun token di accesso.")
     return token
 
 
@@ -416,7 +421,7 @@ def _write_snapshot(args: argparse.Namespace, snapshot: dict[str, Any], attachme
     selected = set(args.profile or [])
     profiles = snapshot.get("profiles") or []
     if selected and not selected.issubset(set(range(1, len(profiles) + 1))):
-        raise ArgoError(f"Profile selection must be between 1 and {len(profiles)}.")
+        raise ArgoError(f"Il profilo selezionato deve essere compreso tra 1 e {len(profiles)}.")
 
     stamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M%S")
     run_dir = args.output.expanduser().resolve() / stamp
@@ -468,14 +473,14 @@ def _write_snapshot(args: argparse.Namespace, snapshot: dict[str, Any], attachme
                         summary["attachmentErrors"].append({"file": filename, "error": str(exc)})
         manifest["profiles"].append(summary)
         print(
-            f"{label}: {summary['homework']} future homework, "
-            f"{summary['promemoria']} future promemoria, "
-            f"{summary['bachecaMessages']} bacheca messages, "
-            f"{summary['attachmentsDownloaded']} documents downloaded."
+            f"{label}: {summary['homework']} compiti futuri, "
+            f"{summary['promemoria']} promemoria futuri, "
+            f"{summary['bachecaMessages']} avvisi in Bacheca, "
+            f"{summary['attachmentsDownloaded']} documenti scaricati."
         )
 
     write_json(run_dir / "manifest.json", manifest)
-    print(f"Export saved to: {run_dir}")
+    print(f"Esportazione salvata in: {run_dir}")
     return 0
 
 
@@ -495,7 +500,7 @@ def export_api(args: argparse.Namespace) -> int:
             body={"uid": document["pk"], "pkScheda": (profile.get("scheda") or {}).get("pk")},
         )
         if not result.get("url"):
-            raise ArgoError("Argo returned no download URL for a bacheca document.")
+            raise ArgoError("Argo non ha restituito l'indirizzo di un documento della Bacheca.")
         return urljoin(API_BASE + "/", result["url"])
 
     return _write_snapshot(args, snapshot, attachment_url)
@@ -545,7 +550,7 @@ def inspect_har(path: Path) -> int:
                 data = ((payload.get("data") or {}).get("dati") or [])
                 dashboard = data[0] if data else {}
     if dashboard is None:
-        raise ArgoError("No dashboard response was found in this HAR.")
+        raise ArgoError("Nel file HAR non è stata trovata alcuna risposta della dashboard.")
     all_work = sum(
         len(item.get("compiti") or [])
         for item in (dashboard.get("registro") or [])
@@ -556,11 +561,11 @@ def inspect_har(path: Path) -> int:
         for item in (dashboard.get("bacheca") or [])
         if isinstance(item, dict)
     )
-    print(f"Captured API endpoints: {len(endpoints)}")
-    print(f"Homework assignments in capture: {all_work}")
-    print(f"Promemoria in capture: {len(dashboard.get('promemoria') or [])}")
-    print(f"Bacheca messages in capture: {len(dashboard.get('bacheca') or [])}")
-    print(f"Bacheca attachments listed: {attachments}")
+    print(f"Endpoint API acquisiti: {len(endpoints)}")
+    print(f"Compiti presenti nell'acquisizione: {all_work}")
+    print(f"Promemoria presenti: {len(dashboard.get('promemoria') or [])}")
+    print(f"Avvisi della Bacheca presenti: {len(dashboard.get('bacheca') or [])}")
+    print(f"Allegati della Bacheca elencati: {attachments}")
     return 0
 
 
@@ -569,32 +574,32 @@ def parser() -> argparse.ArgumentParser:
     sub = result.add_subparsers(dest="command")
     def add_export_options(command: argparse.ArgumentParser) -> None:
         command.add_argument(
-            "--from-date", metavar="YYYY-MM-DD", help="First due/event date to include (default: today)"
+            "--from-date", metavar="AAAA-MM-GG", help="Prima data di consegna/evento da includere (predefinita: oggi)"
         )
         command.add_argument(
-            "--output", type=Path, default=Path("output"), help="Parent folder for timestamped exports"
+            "--output", type=Path, default=Path("output"), help="Cartella che conterrà le esportazioni datate"
         )
         command.add_argument(
-            "--profile", type=int, action="append", help="Export only this 1-based profile; may repeat"
+            "--profile", type=int, action="append", help="Esporta soltanto questo profilo; l'opzione è ripetibile"
         )
         command.add_argument(
-            "--no-downloads", action="store_true", help="Do not download bacheca attachments"
+            "--no-downloads", action="store_true", help="Non scaricare gli allegati della Bacheca"
         )
 
-    api = sub.add_parser("api", help="Use a current access token and call the API directly")
+    api = sub.add_parser("api", help="Usa un token valido e richiama direttamente le API")
     add_export_options(api)
-    api.add_argument("--har", type=Path, help="Read a still-valid access token from a recent HAR")
-    api.add_argument("--token-file", type=Path, help="Read the access token from a private text file")
+    api.add_argument("--har", type=Path, help="Leggi un token ancora valido da un file HAR recente")
+    api.add_argument("--token-file", type=Path, help="Leggi il token da un file di testo privato")
 
-    live = sub.add_parser("browser", help="Use optional browser-assisted login")
+    live = sub.add_parser("browser", help="Usa l'accesso assistito dal browser")
     add_export_options(live)
     live.add_argument(
         "--profile-dir",
         type=Path,
         default=Path(".argo-browser-profile"),
-        help="Private Chrome profile used only for Argo login",
+        help="Profilo Chrome privato usato soltanto per l'accesso ad Argo",
     )
-    inspect = sub.add_parser("inspect-har", help="Safely report collection counts from a HAR")
+    inspect = sub.add_parser("inspect-har", help="Mostra in sicurezza i conteggi presenti in un file HAR")
     inspect.add_argument("path", type=Path)
     return result
 
@@ -611,7 +616,7 @@ def main(argv: list[str] | None = None) -> int:
             return export_api(args)
         return export_live(args)
     except (ArgoError, ValueError, OSError) as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+        print(f"Errore: {exc}", file=sys.stderr)
         return 1
 
 

@@ -1,4 +1,4 @@
-"""Optional Google Drive uploader with lazy imports."""
+"""Caricamento facoltativo su Google Drive con dipendenze importate su richiesta."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ class DriveUploader:
             from google.oauth2.credentials import Credentials
             from googleapiclient.discovery import build
         except ImportError as exc:
-            raise RuntimeError("Install the Google Drive dependencies from requirements.txt") from exc
+            raise RuntimeError("Installa le dipendenze Google Drive indicate in requirements.txt") from exc
 
         credentials = None
         if self.token_file.exists():
@@ -42,7 +42,7 @@ class DriveUploader:
         elif not credentials or not credentials.valid or not scopes.intersection({DRIVE_FILE_SCOPE, DRIVE_FULL_SCOPE}):
             from google_auth_oauthlib.flow import InstalledAppFlow
             if not self.oauth_keys.exists():
-                raise FileNotFoundError(f"Google OAuth keys not found: {self.oauth_keys}")
+                raise FileNotFoundError(f"Chiavi OAuth di Google non trovate: {self.oauth_keys}")
             flow = InstalledAppFlow.from_client_secrets_file(str(self.oauth_keys), [DRIVE_FILE_SCOPE])
             credentials = flow.run_local_server(port=0)
             self.token_file.parent.mkdir(parents=True, exist_ok=True)

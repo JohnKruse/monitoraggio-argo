@@ -1,10 +1,10 @@
-# Copy this file to config.yaml. config.yaml is deliberately ignored by Git.
+# Copia questo file come config.yaml. Il file config.yaml è escluso da Git.
 argo:
-  # browser is easiest for normal use; api accepts a current one-hour token.
+  # browser è la modalità più semplice; api richiede un token ancora valido.
   mode: browser
-  school_code: "YOUR_SCHOOL_CODE"
-  username: "YOUR_USERNAME"
-  password: "YOUR_PASSWORD"
+  school_code: "INSERISCI_CODICE_SCUOLA"
+  username: "INSERISCI_NOME_UTENTE"
+  password: "INSERISCI_PASSWORD"
   browser_profile: .argo-browser-profile
   remember_me: true
   headless: false
@@ -13,28 +13,28 @@ argo:
 
 storage:
   database: data/argo_monitoring.db
-  # PDFs are uploaded to Drive; keep this false to avoid a growing local archive.
+  # I PDF vengono caricati su Drive. Lascia false per evitare un archivio locale crescente.
   keep_local_documents: false
   documents_dir: data/documents
 
 email:
   smtp_host: smtp.gmail.com
   smtp_port: 465
-  sender: "you@example.com"
-  app_password: "YOUR_EMAIL_APP_PASSWORD"
+  sender: "tuo.indirizzo@example.com"
+  app_password: "INSERISCI_PASSWORD_PER_APP_EMAIL"
   test_mode: true
   dev_recipients:
-    - "you@example.com"
+    - "tuo.indirizzo@example.com"
   daily_recipients:
-    - "family@example.com"
+    - "famiglia@example.com"
   bacheca_recipients:
-    - "family@example.com"
+    - "famiglia@example.com"
 
 notifications:
   days_forward: 17
   max_daily_items: 12
   bacheca_recent_items: 10
-  bacheca_weekly_day: sunday
+  bacheca_weekly_day: domenica
   send_daily: true
   send_bacheca: true
 
@@ -44,8 +44,8 @@ files:
   email_header: assets/email_header.png
 
 google_drive:
-  folder_id: "YOUR_GOOGLE_DRIVE_FOLDER_ID"
+  folder_id: "INSERISCI_ID_CARTELLA_GOOGLE_DRIVE"
   oauth_keys_file: ~/.google-identities/client_secret.json
   token_file: ~/.google-identities/google-identity.json
-  # Setting this true makes document links readable by anyone who receives them.
+  # Con true, chiunque riceva il collegamento potrà leggere il documento.
   share_with_link: false

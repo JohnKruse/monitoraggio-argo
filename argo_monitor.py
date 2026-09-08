@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the API-first Argo monitor, persist SQLite data, upload documents, and email reports."""
+"""Esegue Monitoraggio Argo: SQLite, documenti su Drive e riepiloghi via email."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import json
 import shutil
 import sys
 import tempfile
+import unicodedata
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Callable
@@ -51,7 +52,7 @@ def _api_attachment_url(access_token: str, item: dict[str, Any], document: dict[
         body={"uid": document["pk"], "pkScheda": (profile.get("scheda") or {}).get("pk")},
     )
     if not response.get("url"):
-        raise ArgoError("Argo returned no download URL for a Bacheca document")
+        raise ArgoError("Argo non ha restituito l'indirizzo per scaricare un documento della Bacheca")
     return urljoin(API_BASE + "/", response["url"])
 
 
@@ -74,7 +75,7 @@ def _load_saved_export(path: Path) -> dict[str, Any]:
         homework = json.loads((folder / "homework.json").read_text(encoding="utf-8"))
         profiles[-1]["preextracted_homework"] = homework
     if not profiles:
-        raise ArgoError(f"No profile export found below {path}")
+        raise ArgoError(f"Nessuna esportazione di profilo trovata in {path}")
     return {"profiles": profiles}
 
 
@@ -180,12 +181,12 @@ def run(config_path: Path, *, dry_run: bool = False, saved_export: Path | None =
         sent = {"daily": 0, "bacheca": 0}
         email_config = settings.get("email") or {}
         if not dry_run and bool(notification.get("send_daily", True)):
-            sent["daily"] = send_html(email_config, f"Argo assignments — {today.isoformat()}", daily_html, "daily", header_path)
-        weekday = str(notification.get("bacheca_weekly_day") or "sunday").lower()
-        weekly = today.strftime("%A").lower() == weekday
+            sent["daily"] = send_html(email_config, f"Compiti Argo — {today.isoformat()}", daily_html, "daily", header_path)
+        weekday = _weekday_number(str(notification.get("bacheca_weekly_day") or "domenica"))
+        weekly = today.weekday() == weekday
         if not dry_run and bool(notification.get("send_bacheca", True)) and (new_ids or weekly):
-            prefix = "New notice — " if new_ids else "Weekly "
-            sent["bacheca"] = send_html(email_config, prefix + f"Argo Bacheca — {today.isoformat()}", bacheca_html, "bacheca", header_path)
+            prefix = "Nuovo avviso — " if new_ids else "Riepilogo settimanale — "
+            sent["bacheca"] = send_html(email_config, prefix + f"Bacheca Argo — {today.isoformat()}", bacheca_html, "bacheca", header_path)
             store.mark_bacheca_notified(new_ids)
         detail = {"database": str(db_path), "counts": store.counts(), "new_bacheca": len(new_ids), "sent": sent, "dry_run": dry_run}
         store.finish_run(run_id, "OK", json.dumps(detail))
@@ -203,8 +204,8 @@ def run(config_path: Path, *, dry_run: bool = False, saved_export: Path | None =
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     result.add_argument("--config", type=Path, default=Path("config.yaml"))
-    result.add_argument("--dry-run", action="store_true", help="Update SQLite and previews, but do not email or upload")
-    result.add_argument("--saved-export", type=Path, help="Use a previous exporter output for an offline dry run")
+    result.add_argument("--dry-run", action="store_true", help="Aggiorna SQLite e le anteprime senza inviare email o caricare file")
+    result.add_argument("--saved-export", type=Path, help="Usa una precedente esportazione per una prova offline")
     return result
 
 
@@ -215,8 +216,24 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(detail, indent=2))
         return 0
     except (ArgoError, ConfigurationError, OSError, RuntimeError, ValueError) as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+        print(f"Errore: {exc}", file=sys.stderr)
         return 1
+
+
+def _weekday_number(value: str) -> int:
+    normalized = "".join(
+        char for char in unicodedata.normalize("NFKD", value.lower().strip())
+        if not unicodedata.combining(char)
+    )
+    weekdays = {
+        "lunedi": 0, "monday": 0, "martedi": 1, "tuesday": 1,
+        "mercoledi": 2, "wednesday": 2, "giovedi": 3, "thursday": 3,
+        "venerdi": 4, "friday": 4, "sabato": 5, "saturday": 5,
+        "domenica": 6, "sunday": 6,
+    }
+    if normalized not in weekdays:
+        raise ValueError(f"Giorno settimanale non riconosciuto: {value}")
+    return weekdays[normalized]
 
 
 if __name__ == "__main__":

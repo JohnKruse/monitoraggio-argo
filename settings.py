@@ -1,4 +1,4 @@
-"""Configuration loading for the Argo monitor."""
+"""Caricamento della configurazione di Monitoraggio Argo."""
 
 from __future__ import annotations
 
@@ -16,12 +16,12 @@ def load_settings(path: str | Path) -> dict[str, Any]:
     config_path = Path(path).expanduser().resolve()
     if not config_path.exists():
         raise ConfigurationError(
-            f"Configuration file not found: {config_path}. "
-            "Copy config.example.yaml to config.yaml and fill in the private values."
+            f"File di configurazione non trovato: {config_path}. "
+            "Copia config.example.yaml come config.yaml e inserisci i dati privati."
         )
     data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
     if not isinstance(data, dict):
-        raise ConfigurationError("The top level of config.yaml must be a mapping.")
+        raise ConfigurationError("Il livello principale di config.yaml deve essere una mappa YAML.")
     data["_config_dir"] = config_path.parent
     return data
 

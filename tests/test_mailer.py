@@ -14,7 +14,7 @@ class MailerTests(unittest.TestCase):
         row = {"id": "n", "message": "Notice", "attachments": [{"filename": "a.pdf", "drive_url": "https://drive.test/a"}]}
         html = render_bacheca_email([row], {"n"}, date(2026, 9, 8))
         self.assertIn("https://drive.test/a", html)
-        self.assertIn("NEW", html)
+        self.assertIn("NUOVO", html)
 
 
 if __name__ == "__main__":
