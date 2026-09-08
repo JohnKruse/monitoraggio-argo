@@ -1,0 +1,30 @@
+language_name: italiano
+plain_text_fallback: Questo messaggio contiene un riepilogo scolastico in formato HTML.
+test_prefix: "[PROVA] "
+daily:
+  subject: "Compiti Argo - {date}"
+  title: "Prossimi impegni scolastici - {label}"
+  no_items: "Nessun compito, promemoria o evento manuale in programma."
+  schedule: "Orario delle lezioni - {date}"
+  reminder: "Promemoria"
+  manual_event: "Evento manuale"
+  important: "IMPORTANTE"
+  columns:
+    date: Data
+    assignment: Compito / evento
+    subject: Materia
+    important: Importante
+bacheca:
+  subject_new: "*** NUOVO AVVISO Bacheca Argo - {date}"
+  subject_weekly: "Riepilogo settimanale Bacheca Argo - {date}"
+  new_heading: "*** NUOVO AVVISO BACHECA QUI SOTTO ***"
+  title: "Documenti Bacheca Argo"
+  empty: "Non è ancora presente alcun avviso della Bacheca."
+  fallback_subject: Avviso
+  document: Documento
+  fields:
+    subject: Oggetto
+    date: Data
+    summary: Riassunto
+    original_subject: Oggetto originale
+    file: File

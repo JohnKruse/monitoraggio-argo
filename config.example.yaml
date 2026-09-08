@@ -18,6 +18,8 @@ storage:
   documents_dir: data/documents
 
 email:
+  # Le email sono in italiano per impostazione predefinita. Usa en per l'inglese.
+  language: it
   smtp_host: smtp.gmail.com
   smtp_port: 465
   sender: "tuo.indirizzo@example.com"
@@ -38,10 +40,19 @@ notifications:
   send_daily: true
   send_bacheca: true
 
+summaries:
+  # Crea un titolo e un riassunto tradotto dei documenti Bacheca.
+  # Richiede OPENAI_API_KEY nell'ambiente.
+  enabled: true
+  language: it
+  model: gpt-5-mini
+
 files:
   schedule: data/schedule.csv
   manual_events: data/manual_events.csv
-  email_header: assets/email_header.png
+  # Il file incluso è un segnaposto: sostituiscilo con le tue immagini.
+  daily_email_header: assets/email_header.png
+  bacheca_email_header: assets/email_header.png
 
 google_drive:
   folder_id: "INSERISCI_ID_CARTELLA_GOOGLE_DRIVE"

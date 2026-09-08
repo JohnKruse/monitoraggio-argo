@@ -27,9 +27,11 @@ from argo_exporter import (
     safe_filename,
 )
 from drive_uploader import DriveUploader
-from mailer import read_manual_events, render_bacheca_email, render_daily_email, save_preview, send_html
+from i18n import normalize_language
+from mailer import email_subject, read_manual_events, render_bacheca_email, render_daily_email, save_preview, send_html
 from settings import ConfigurationError, load_settings, resolve_path
 from storage import ArgoStore, stable_id
+from summarizer import summarize_bacheca
 
 
 def _token_args(config: dict[str, Any]) -> argparse.Namespace:
@@ -117,6 +119,7 @@ def run(config_path: Path, *, dry_run: bool = False, saved_export: Path | None =
         all_reminders: list[dict[str, Any]] = []
         new_ids: list[str] = []
         document_lookup: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
+        bacheca_lookup: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
         labels: list[str] = []
         for item in snapshot.get("profiles") or []:
             profile = item.get("profile") or {}
@@ -132,61 +135,112 @@ def run(config_path: Path, *, dry_run: bool = False, saved_export: Path | None =
             new_ids.extend(store.save_collections(profile_id, homework, reminders, collections.bacheca))
             for message in collections.bacheca:
                 message_id = stable_id(profile_id, str(message.get("pk") or stable_id(message.get("data"), message.get("messaggio"))))
+                bacheca_lookup[message_id] = (item, message)
                 for doc in message.get("listaAllegati") or []:
                     attachment_id = stable_id(message_id, str(doc.get("pk") or stable_id(doc.get("nomeFile"))))
                     document_lookup[attachment_id] = (item, doc)
 
+        email_config = settings.get("email") or {}
+        email_language = normalize_language(email_config.get("language") or "it")
+        summary_config = settings.get("summaries") or {}
+        summaries_enabled = bool(summary_config.get("enabled", True))
+        summary_language = normalize_language(summary_config.get("language") or email_language)
+        summary_model = str(summary_config.get("model") or "gpt-5-mini")
         drive = DriveUploader(settings.get("google_drive") or {})
         keep_local = bool(storage_config.get("keep_local_documents", False))
         documents_dir = resolve_path(settings, storage_config.get("documents_dir") or "data/documents")
-        if (drive.enabled or keep_local) and attachment_url:
+        if drive.enabled or keep_local or summaries_enabled:
             documents_dir.mkdir(parents=True, exist_ok=True)
-            for row in store.pending_attachments(new_ids):
-                source = document_lookup.get(row["id"])
-                if not source:
-                    continue
-                item, document = source
-                filename = safe_filename(row["filename"])
-                target = documents_dir / f"{row['id'][:12]}_{filename}"
-                try:
-                    if not target.exists():
-                        _download(attachment_url(item, document), target)
-                    drive_url = drive_file_id = None
-                    if drive.enabled and not dry_run:
-                        drive_url, drive_file_id = drive.upload(target, row["argo_id"], filename)
-                    local_path = str(target) if keep_local else None
-                    store.update_attachment(row["id"], local_path=local_path, drive_file_id=drive_file_id, drive_url=drive_url)
-                    if not keep_local:
+            for message_id, (_, message) in bacheca_lookup.items():
+                needs_summary = summaries_enabled and store.bacheca_needs_summary(message_id, summary_language)
+                local_documents: list[Path] = []
+                temporary_documents: list[Path] = []
+                for row in store.attachment_rows(message_id):
+                    source = document_lookup.get(row["id"])
+                    if not source or not attachment_url:
+                        continue
+                    item, document = source
+                    filename = safe_filename(row["filename"])
+                    target = documents_dir / f"{row['id'][:12]}_{filename}"
+                    needs_drive = drive.enabled and not row["drive_url"]
+                    if not (needs_summary or needs_drive or keep_local):
+                        continue
+                    try:
+                        if not target.exists():
+                            _download(attachment_url(item, document), target)
+                        local_documents.append(target)
+                        if not keep_local:
+                            temporary_documents.append(target)
+                        drive_url = row["drive_url"]
+                        drive_file_id = row["drive_file_id"]
+                        if needs_drive and not dry_run:
+                            drive_url, drive_file_id = drive.upload(target, row["argo_id"], filename)
+                        store.update_attachment(
+                            row["id"], local_path=str(target) if keep_local else None,
+                            drive_file_id=drive_file_id, drive_url=drive_url,
+                        )
+                    except Exception as exc:
+                        store.update_attachment(
+                            row["id"], local_path=row["local_path"],
+                            drive_file_id=row["drive_file_id"], drive_url=row["drive_url"], error=str(exc),
+                        )
+                if needs_summary:
+                    try:
+                        result = summarize_bacheca(
+                            str(message.get("messaggio") or ""),
+                            category=str(message.get("categoria") or ""),
+                            author=str(message.get("autore") or ""),
+                            files=local_documents,
+                            language=summary_language,
+                            model=summary_model,
+                        )
+                        store.update_bacheca_summary(
+                            message_id, title=result["title"], summary=result["summary"],
+                            language=summary_language, model=summary_model,
+                        )
+                    except Exception as exc:
+                        store.update_bacheca_summary(
+                            message_id, language=summary_language, model=summary_model, error=str(exc),
+                        )
+                if not keep_local:
+                    for target in temporary_documents:
                         target.unlink(missing_ok=True)
-                except Exception as exc:
-                    store.update_attachment(row["id"], error=str(exc))
 
         files = settings.get("files") or {}
         schedule_path = resolve_path(settings, files.get("schedule") or "data/schedule.csv")
         manual_path = resolve_path(settings, files.get("manual_events") or "data/manual_events.csv")
-        header_path = resolve_path(settings, files.get("email_header") or "assets/email_header.png")
+        daily_header_path = resolve_path(
+            settings, files.get("daily_email_header") or files.get("email_header") or "assets/email_header.png"
+        )
+        bacheca_header_path = resolve_path(
+            settings, files.get("bacheca_email_header") or files.get("email_header") or "assets/email_header.png"
+        )
         manual_events = read_manual_events(manual_path, today, end)
         max_items = int(notification.get("max_daily_items", 12))
         daily_html = render_daily_email(
             ", ".join(labels), all_homework[:max_items], all_reminders[:max_items],
-            manual_events, schedule_path, today,
+            manual_events, schedule_path, today, email_language,
         )
         recent_limit = int(notification.get("bacheca_recent_items", 10))
         bacheca_rows = store.bacheca_rows(recent_limit)
-        bacheca_html = render_bacheca_email(bacheca_rows, set(new_ids), today)
+        bacheca_html = render_bacheca_email(bacheca_rows, set(new_ids), today, email_language)
         preview_dir = resolve_path(settings, "data/previews")
         save_preview(preview_dir / "daily.html", daily_html)
         save_preview(preview_dir / "bacheca.html", bacheca_html)
 
         sent = {"daily": 0, "bacheca": 0}
-        email_config = settings.get("email") or {}
         if not dry_run and bool(notification.get("send_daily", True)):
-            sent["daily"] = send_html(email_config, f"Compiti Argo — {today.isoformat()}", daily_html, "daily", header_path)
+            sent["daily"] = send_html(
+                email_config, email_subject("daily", today, language=email_language),
+                daily_html, "daily", daily_header_path,
+            )
         weekday = _weekday_number(str(notification.get("bacheca_weekly_day") or "domenica"))
         weekly = today.weekday() == weekday
         if not dry_run and bool(notification.get("send_bacheca", True)) and (new_ids or weekly):
-            prefix = "Nuovo avviso — " if new_ids else "Riepilogo settimanale — "
-            sent["bacheca"] = send_html(email_config, prefix + f"Bacheca Argo — {today.isoformat()}", bacheca_html, "bacheca", header_path)
+            sent["bacheca"] = send_html(
+                email_config, email_subject("bacheca", today, language=email_language, has_new=bool(new_ids)),
+                bacheca_html, "bacheca", bacheca_header_path,
+            )
             store.mark_bacheca_notified(new_ids)
         detail = {"database": str(db_path), "counts": store.counts(), "new_bacheca": len(new_ids), "sent": sent, "dry_run": dry_run}
         store.finish_run(run_id, "OK", json.dumps(detail))

@@ -1,0 +1,30 @@
+language_name: English
+plain_text_fallback: This message contains a school summary in HTML format.
+test_prefix: "[TEST] "
+daily:
+  subject: "Argo Assignments - {date}"
+  title: "Upcoming school work - {label}"
+  no_items: "No assignments, reminders, or manual events are currently scheduled."
+  schedule: "Class Schedule - {date}"
+  reminder: Reminder
+  manual_event: Manual event
+  important: IMPORTANT
+  columns:
+    date: Date
+    assignment: Assignment
+    subject: Subject
+    important: Important
+bacheca:
+  subject_new: "*** NEW NOTICE Argo Bacheca Listing - {date}"
+  subject_weekly: "Weekly Argo Bacheca Listing - {date}"
+  new_heading: "*** NEW BACHECA NOTICE BELOW ***"
+  title: "Argo Bacheca Documents"
+  empty: "There are no Bacheca notices yet."
+  fallback_subject: Notice
+  document: Document
+  fields:
+    subject: Subject
+    date: Date
+    summary: Summary
+    original_subject: Original subject
+    file: File

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 from pathlib import Path
 
 import yaml
@@ -34,6 +35,7 @@ def migrate(source: Path, destination: Path) -> None:
             "documents_dir": "data/documents",
         },
         "email": {
+            "language": "en",
             "smtp_host": "smtp.gmail.com",
             "smtp_port": 465,
             "sender": old.get("email_sender", ""),
@@ -51,10 +53,16 @@ def migrate(source: Path, destination: Path) -> None:
             "send_daily": True,
             "send_bacheca": True,
         },
+        "summaries": {
+            "enabled": True,
+            "language": "en",
+            "model": "gpt-5-mini",
+        },
         "files": {
             "schedule": "data/schedule.csv",
             "manual_events": "data/manual_events.csv",
-            "email_header": "assets/email_header.png",
+            "daily_email_header": "assets/private/WilliamHomeworkLogoMajo2024.png",
+            "bacheca_email_header": "assets/private/WilliamBachecaLogoMajo2024.png",
         },
         "google_drive": {
             "folder_id": old.get("google_drive_folder_id", ""),
@@ -64,6 +72,13 @@ def migrate(source: Path, destination: Path) -> None:
         },
     }
     destination.parent.mkdir(parents=True, exist_ok=True)
+    private_assets = destination.parent / "assets" / "private"
+    private_assets.mkdir(parents=True, exist_ok=True)
+    source_root = source.expanduser().resolve().parent
+    for filename in ("WilliamHomeworkLogoMajo2024.png", "WilliamBachecaLogoMajo2024.png"):
+        old_header = source_root / filename
+        if old_header.exists():
+            shutil.copy2(old_header, private_assets / filename)
     destination.write_text(yaml.safe_dump(new, sort_keys=False, allow_unicode=True), encoding="utf-8")
     destination.chmod(0o600)
 

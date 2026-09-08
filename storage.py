@@ -71,6 +71,12 @@ class ArgoStore:
                     first_seen_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     notified_at TEXT,
+                    summary_title TEXT,
+                    summary TEXT,
+                    summary_language TEXT,
+                    summary_model TEXT,
+                    summary_error TEXT,
+                    summarized_at TEXT,
                     UNIQUE(profile_id, argo_id)
                 );
                 CREATE INDEX IF NOT EXISTS bacheca_date_idx ON bacheca(publish_date DESC);
@@ -96,6 +102,13 @@ class ArgoStore:
                 );
                 """
             )
+            columns = {row[1] for row in db.execute("PRAGMA table_info(bacheca)")}
+            for name in (
+                "summary_title", "summary", "summary_language", "summary_model",
+                "summary_error", "summarized_at",
+            ):
+                if name not in columns:
+                    db.execute(f"ALTER TABLE bacheca ADD COLUMN {name} TEXT")
 
     def start_run(self) -> int:
         with self.connect() as db:
@@ -218,6 +231,37 @@ class ArgoStore:
                 (local_path, drive_file_id, drive_url, error,
                  datetime.now().astimezone().isoformat(timespec="seconds"), attachment_id),
             )
+
+    def bacheca_needs_summary(self, bacheca_id: str, language: str) -> bool:
+        with self.connect() as db:
+            row = db.execute(
+                "SELECT summary, summary_language FROM bacheca WHERE id=?", (bacheca_id,)
+            ).fetchone()
+            return bool(row and (not row["summary"] or row["summary_language"] != language))
+
+    def update_bacheca_summary(
+        self,
+        bacheca_id: str,
+        *,
+        title: str | None = None,
+        summary: str | None = None,
+        language: str | None = None,
+        model: str | None = None,
+        error: str | None = None,
+    ) -> None:
+        with self.connect() as db:
+            db.execute(
+                """UPDATE bacheca SET summary_title=?, summary=?, summary_language=?,
+                   summary_model=?, summary_error=?, summarized_at=? WHERE id=?""",
+                (title, summary, language, model, error,
+                 datetime.now().astimezone().isoformat(timespec="seconds"), bacheca_id),
+            )
+
+    def attachment_rows(self, bacheca_id: str) -> list[sqlite3.Row]:
+        with self.connect() as db:
+            return list(db.execute(
+                "SELECT * FROM attachments WHERE bacheca_id=? ORDER BY filename", (bacheca_id,)
+            ).fetchall())
 
     def bacheca_rows(self, limit: int = 10) -> list[dict[str, Any]]:
         with self.connect() as db:

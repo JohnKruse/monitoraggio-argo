@@ -8,6 +8,7 @@ data/schedule.csv
 data/manual_events.csv
 data/documents/
 data/previews/
+assets/private/
 *.har
 *.log
 __pycache__/

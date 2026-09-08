@@ -10,6 +10,11 @@ state in a single SQLite database. It sends a daily schoolwork email and another
 new Bacheca notices appear, with an optional weekly digest. Bacheca attachments can be uploaded
 to Google Drive; by default, they are not retained locally after upload.
 
+The emails preserve the carefully developed 2024 format: a schoolwork table, a timetable with
+the next school day highlighted, and a vertical detail card for each Bacheca notice. Each
+Bacheca document can receive a translated title and summary; Italian is the public default.
+Filenames in the email are clickable links to their documents on Drive.
+
 The program never calls Argo's “presa visione” or “adesione” functions.
 
 ## Installation
@@ -25,6 +30,14 @@ cp data/manual_events.example.csv data/manual_events.csv
 
 Enter your details in `config.yaml`. This file is private and excluded from Git. Never put real
 credentials in `config.example.yaml`.
+
+Set `email.language` and `summaries.language` to either `it` or `en`. To generate summaries,
+also set the `OPENAI_API_KEY` environment variable. You can turn the feature off with
+`summaries.enabled: false`.
+
+The repository includes `assets/email_header.png` as a placeholder. You can select different
+images with `files.daily_email_header` and `files.bacheca_email_header`. Put personalized
+images under `assets/private/`, which Git ignores.
 
 To import only the useful settings from the 2024 project:
 
@@ -58,14 +71,15 @@ file containing the token. The captured token normally lasts about one hour, so 
 suitable by itself for unattended daily operation.
 
 The `--dry-run` option updates SQLite and the HTML previews but sends no email and uploads no
-files. Previews are saved under `data/previews/` and excluded from Git.
+files to Drive. If summaries are missing and the feature is enabled, it still generates them.
+Previews are saved under `data/previews/` and excluded from Git.
 
 ## What was intentionally excluded
 
 The project does not include Selenium/Helium scraping, pandas-generated intermediate CSV files,
-debug captures, duplicate scripts, AI/OCR dependencies, historical PDF downloads, or the old
-virtual environment. Emails use the text and metadata supplied by the Argo API, keeping normal
-runs deterministic and inexpensive.
+debug captures, duplicate scripts, heavyweight OCR dependencies, historical PDF downloads, or
+the old virtual environment. Documents are sent directly to the summary service and then
+removed from disk unless local retention is explicitly enabled.
 
 ## Public repository security
 

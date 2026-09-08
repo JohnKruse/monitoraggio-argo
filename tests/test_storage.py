@@ -25,6 +25,20 @@ class StorageTests(unittest.TestCase):
             ids = store.save_collections(profile_id, [], [], [notice])
             self.assertEqual(1, len(store.pending_attachments(ids)))
 
+    def test_bacheca_summary_is_saved_for_one_language(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ArgoStore(Path(directory) / "argo.db")
+            profile_id = store.save_profile({}, "Student", 0)
+            notice = {"pk": "n", "messaggio": "Notice", "listaAllegati": []}
+            notice_id = store.save_collections(profile_id, [], [], [notice])[0]
+            self.assertTrue(store.bacheca_needs_summary(notice_id, "it"))
+            store.update_bacheca_summary(
+                notice_id, title="Titolo", summary="Riassunto", language="it", model="test"
+            )
+            self.assertFalse(store.bacheca_needs_summary(notice_id, "it"))
+            self.assertTrue(store.bacheca_needs_summary(notice_id, "en"))
+            self.assertEqual("Riassunto", store.bacheca_rows()[0]["summary"])
+
 
 if __name__ == "__main__":
     unittest.main()
