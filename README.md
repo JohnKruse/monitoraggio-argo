@@ -1,5 +1,7 @@
 # Monitoraggio Argo
 
+[Read this documentation in English](README_EN.md)
+
 Un piccolo monitor basato sulle API di Argo Famiglia, pensato per sostituire le fragili
 procedure di scraping del sito.
 
