@@ -1,0 +1,51 @@
+# Copy this file to config.yaml. config.yaml is deliberately ignored by Git.
+argo:
+  # browser is easiest for normal use; api accepts a current one-hour token.
+  mode: browser
+  school_code: "YOUR_SCHOOL_CODE"
+  username: "YOUR_USERNAME"
+  password: "YOUR_PASSWORD"
+  browser_profile: .argo-browser-profile
+  remember_me: true
+  headless: false
+  # har_file: /private/path/to/recent.har
+  # token_file: /private/path/to/current-token.txt
+
+storage:
+  database: data/argo_monitoring.db
+  # PDFs are uploaded to Drive; keep this false to avoid a growing local archive.
+  keep_local_documents: false
+  documents_dir: data/documents
+
+email:
+  smtp_host: smtp.gmail.com
+  smtp_port: 465
+  sender: "you@example.com"
+  app_password: "YOUR_EMAIL_APP_PASSWORD"
+  test_mode: true
+  dev_recipients:
+    - "you@example.com"
+  daily_recipients:
+    - "family@example.com"
+  bacheca_recipients:
+    - "family@example.com"
+
+notifications:
+  days_forward: 17
+  max_daily_items: 12
+  bacheca_recent_items: 10
+  bacheca_weekly_day: sunday
+  send_daily: true
+  send_bacheca: true
+
+files:
+  schedule: data/schedule.csv
+  manual_events: data/manual_events.csv
+  email_header: assets/email_header.png
+
+google_drive:
+  folder_id: "YOUR_GOOGLE_DRIVE_FOLDER_ID"
+  oauth_keys_file: ~/.google-identities/client_secret.json
+  token_file: ~/.google-identities/google-identity.json
+  # Setting this true makes document links readable by anyone who receives them.
+  share_with_link: false

@@ -1,0 +1,14 @@
+.argo-browser-profile/
+.venv/
+output/
+config.yaml
+data/*.db
+data/*.db-*
+data/schedule.csv
+data/manual_events.csv
+data/documents/
+data/previews/
+*.har
+*.log
+__pycache__/
+.pytest_cache/
