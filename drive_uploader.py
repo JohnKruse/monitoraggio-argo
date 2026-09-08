@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import mimetypes
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -53,10 +54,10 @@ class DriveUploader:
 
     def upload(self, local_path: str | Path, attachment_id: str, filename: str) -> tuple[str, str]:
         service = self._get_service()
-        escaped = attachment_id.replace("'", "\\'")
+        property_id = self._property_id(attachment_id)
         query = (
             f"'{self.folder_id}' in parents and trashed=false and "
-            f"appProperties has {{ key='argoAttachmentId' and value='{escaped}' }}"
+            f"appProperties has {{ key='argoAttachmentId' and value='{property_id}' }}"
         )
         existing = service.files().list(q=query, fields="files(id,webViewLink)").execute().get("files", [])
         if existing:
@@ -66,7 +67,7 @@ class DriveUploader:
         metadata = {
             "name": filename,
             "parents": [self.folder_id],
-            "appProperties": {"argoAttachmentId": attachment_id},
+            "appProperties": {"argoAttachmentId": property_id},
         }
         created = service.files().create(
             body=metadata,
@@ -81,3 +82,8 @@ class DriveUploader:
     @staticmethod
     def _link(file_id: str) -> str:
         return f"https://drive.google.com/file/d/{file_id}/view"
+
+    @staticmethod
+    def _property_id(attachment_id: str) -> str:
+        """Produce a stable value below Google Drive's 124-byte property limit."""
+        return hashlib.sha256(attachment_id.encode("utf-8")).hexdigest()
