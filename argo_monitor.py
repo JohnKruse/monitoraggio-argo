@@ -81,7 +81,10 @@ def _load_saved_export(path: Path) -> dict[str, Any]:
     return {"profiles": profiles}
 
 
-def run(config_path: Path, *, dry_run: bool = False, saved_export: Path | None = None) -> dict[str, Any]:
+def run(
+    config_path: Path, *, dry_run: bool = False,
+    saved_export: Path | None = None, only: str = "all",
+) -> dict[str, Any]:
     settings = load_settings(config_path)
     storage_config = settings.get("storage") or {}
     db_path = resolve_path(settings, storage_config.get("database") or "data/argo_monitoring.db")
@@ -229,20 +232,26 @@ def run(config_path: Path, *, dry_run: bool = False, saved_export: Path | None =
         save_preview(preview_dir / "bacheca.html", bacheca_html)
 
         sent = {"daily": 0, "bacheca": 0}
-        if not dry_run and bool(notification.get("send_daily", True)):
+        if only in {"all", "daily"} and not dry_run and bool(notification.get("send_daily", True)):
             sent["daily"] = send_html(
                 email_config, email_subject("daily", today, language=email_language),
                 daily_html, "daily", daily_header_path,
             )
         weekday = _weekday_number(str(notification.get("bacheca_weekly_day") or "domenica"))
         weekly = today.weekday() == weekday
-        if not dry_run and bool(notification.get("send_bacheca", True)) and (new_ids or weekly):
+        if (
+            only in {"all", "bacheca"} and not dry_run
+            and bool(notification.get("send_bacheca", True)) and (new_ids or weekly)
+        ):
             sent["bacheca"] = send_html(
                 email_config, email_subject("bacheca", today, language=email_language, has_new=bool(new_ids)),
                 bacheca_html, "bacheca", bacheca_header_path,
             )
             store.mark_bacheca_notified(new_ids)
-        detail = {"database": str(db_path), "counts": store.counts(), "new_bacheca": len(new_ids), "sent": sent, "dry_run": dry_run}
+        detail = {
+            "database": str(db_path), "counts": store.counts(), "new_bacheca": len(new_ids),
+            "sent": sent, "dry_run": dry_run, "only": only,
+        }
         store.finish_run(run_id, "OK", json.dumps(detail))
         return detail
     except BaseException as exc:
@@ -260,13 +269,17 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--config", type=Path, default=Path("config.yaml"))
     result.add_argument("--dry-run", action="store_true", help="Aggiorna SQLite e le anteprime senza inviare email o caricare file")
     result.add_argument("--saved-export", type=Path, help="Usa una precedente esportazione per una prova offline")
+    result.add_argument(
+        "--only", choices=("all", "daily", "bacheca"), default="all",
+        help="Invia entrambi i tipi di email oppure soltanto quello scelto",
+    )
     return result
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
-        detail = run(args.config, dry_run=args.dry_run, saved_export=args.saved_export)
+        detail = run(args.config, dry_run=args.dry_run, saved_export=args.saved_export, only=args.only)
         print(json.dumps(detail, indent=2))
         return 0
     except (ArgoError, ConfigurationError, OSError, RuntimeError, ValueError) as exc:

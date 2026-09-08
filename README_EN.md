@@ -61,6 +61,9 @@ For a normal browser-assisted run:
 python3 argo_monitor.py
 ```
 
+To keep separate schedules without sending duplicates, use `--only daily` and
+`--only bacheca`, respectively.
+
 The dedicated browser profile can preserve the Argo session. When the new SSO form appears, the
 program enters the school code, username, and password from the private `config.yaml` file and
 selects “Remember me.” Manual interaction may still be required if Argo adds another

@@ -62,6 +62,9 @@ Per una normale esecuzione con accesso assistito dal browser:
 python3 argo_monitor.py
 ```
 
+Per mantenere due pianificazioni separate senza inviare doppioni, usa rispettivamente
+`--only daily` e `--only bacheca`.
+
 Il profilo browser dedicato può conservare la sessione Argo. Quando compare il nuovo modulo
 SSO, il programma inserisce codice scuola, nome utente e password dal file privato
 `config.yaml` e seleziona «Ricordami». Potrebbe essere comunque necessario intervenire se
