@@ -190,7 +190,7 @@ def run(config_path: Path, *, dry_run: bool = False, saved_export: Path | None =
         detail = {"database": str(db_path), "counts": store.counts(), "new_bacheca": len(new_ids), "sent": sent, "dry_run": dry_run}
         store.finish_run(run_id, "OK", json.dumps(detail))
         return detail
-    except Exception as exc:
+    except BaseException as exc:
         store.finish_run(run_id, "ERROR", str(exc))
         raise
     finally:
