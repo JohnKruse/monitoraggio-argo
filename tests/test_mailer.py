@@ -103,6 +103,28 @@ class MailerTests(unittest.TestCase):
         self.assertIn("border-top:2px solid #222;", html)
         self.assertIn(">IMPORTANT</span>", html)
 
+    def test_daily_excludes_same_day_assignments_and_promemoria(self):
+        today = date(2026, 9, 28)
+        homework = [
+            {"dataConsegna": "2026-09-28", "materia": "MATEMATICA", "compito": "Due today"},
+            {"dataConsegna": "2026-09-29", "materia": "ARTE", "compito": "Due tomorrow"},
+        ]
+        reminders = [
+            {"datGiorno": "2026-09-28", "materia": "Reminder", "desAnnotazioni": "Interrogazione today"},
+            {"datGiorno": "2026-09-30", "materia": "Reminder", "desAnnotazioni": "Future test"},
+        ]
+        manual = [
+            {"Date": "2026-09-28", "Assignment": "Manual event today", "Subject": "School"},
+            {"Date": "2026-09-29", "Assignment": "Manual event tomorrow", "Subject": "School"},
+        ]
+        html = render_daily_email("Student", homework, reminders, manual, None, today, "en")
+        self.assertNotIn("Due today", html)
+        self.assertNotIn("Interrogazione today", html)
+        self.assertNotIn("Manual event today", html)
+        self.assertIn("Due tomorrow", html)
+        self.assertIn("Future test", html)
+        self.assertIn("Manual event tomorrow", html)
+
 
 if __name__ == "__main__":
     unittest.main()

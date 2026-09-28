@@ -175,27 +175,37 @@ def render_daily_email(
 ) -> str:
     tr = Translator(language)
     items: list[tuple[str, str, str, bool]] = []
+    base_date = (today + timedelta(days=1)).isoformat()
     for item in homework:
+        due = str(item.get("dataConsegna") or "")[:10]
+        if due < base_date:
+            continue
         assignment = str(item.get("compito") or "").strip()
         subject = str(item.get("materia") or "").strip()
         assigned_tag = _format_assigned_date(item.get("dataAssegnazione") or item.get("assigned_date"))
         if assigned_tag and not assignment.endswith(assigned_tag):
             assignment = f"{assignment} {assigned_tag}"
         is_imp = is_important_entry(f"{subject} {assignment}")
-        items.append((str(item.get("dataConsegna") or "")[:10], assignment, subject, is_imp))
+        items.append((due, assignment, subject, is_imp))
     for item in reminders:
+        due = str(item.get("datGiorno") or "")[:10]
+        if due < base_date:
+            continue
         assignment = str(item.get("desAnnotazioni") or item.get("annotazione") or item.get("descrizione") or "").strip()
         subject = str(item.get("materia") or tr.text("daily.reminder")).strip()
         if not assignment.endswith("(Promemoria)"):
             assignment = f"{assignment} (Promemoria)"
         is_imp = is_important_entry(f"{subject} {assignment}")
-        items.append((str(item.get("datGiorno") or "")[:10], assignment, subject, is_imp))
+        items.append((due, assignment, subject, is_imp))
     for item in manual_events:
+        due = str(item.get("Date") or "")[:10]
+        if due < base_date:
+            continue
         assignment = str(item.get("Assignment") or "").strip()
         subject = str(item.get("Subject") or tr.text("daily.manual_event")).strip()
         manual_imp = str(item.get("Important") or "").strip().lower() in ("true", "1", "yes", "important", "*****", "x")
         is_imp = manual_imp or is_important_entry(f"{subject} {assignment}")
-        items.append((str(item.get("Date") or "")[:10], assignment, subject, is_imp))
+        items.append((due, assignment, subject, is_imp))
     items.sort(key=lambda row: (row[0], row[2], row[1]))
 
     sections: list[str] = []

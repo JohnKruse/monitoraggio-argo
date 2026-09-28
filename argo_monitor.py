@@ -218,10 +218,19 @@ def run(
         bacheca_header_path = resolve_path(
             settings, files.get("bacheca_email_header") or files.get("email_header") or "assets/email_header.png"
         )
-        manual_events = read_manual_events(manual_path, today, end)
+        start_date = today + timedelta(days=1)
+        manual_events = read_manual_events(manual_path, start_date, end)
+        daily_homework = [
+            row for row in all_homework
+            if str(row.get("dataConsegna") or "")[:10] >= start_date.isoformat()
+        ]
+        daily_reminders = [
+            row for row in all_reminders
+            if str(row.get("datGiorno") or "")[:10] >= start_date.isoformat()
+        ]
         max_items = int(notification.get("max_daily_items", 12))
         daily_html = render_daily_email(
-            ", ".join(labels), all_homework[:max_items], all_reminders[:max_items],
+            ", ".join(labels), daily_homework[:max_items], daily_reminders[:max_items],
             manual_events, schedule_path, today, email_language,
         )
         recent_limit = int(notification.get("bacheca_recent_items", 10))
