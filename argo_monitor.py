@@ -84,6 +84,7 @@ def _load_saved_export(path: Path) -> dict[str, Any]:
 def run(
     config_path: Path, *, dry_run: bool = False,
     saved_export: Path | None = None, only: str = "all",
+    test_mode: bool | None = None, recipient: str | None = None,
 ) -> dict[str, Any]:
     settings = load_settings(config_path)
     storage_config = settings.get("storage") or {}
@@ -144,6 +145,11 @@ def run(
                     document_lookup[attachment_id] = (item, doc)
 
         email_config = settings.get("email") or {}
+        if test_mode is not None:
+            email_config["test_mode"] = test_mode
+        if recipient:
+            email_config["test_mode"] = True
+            email_config["dev_recipients"] = [recipient]
         email_language = normalize_language(email_config.get("language") or "it")
         summary_config = settings.get("summaries") or {}
         summaries_enabled = bool(summary_config.get("enabled", True))
@@ -282,13 +288,22 @@ def parser() -> argparse.ArgumentParser:
         "--only", choices=("all", "daily", "bacheca"), default="all",
         help="Invia entrambi i tipi di email oppure soltanto quello scelto",
     )
+    result.add_argument("--test", action="store_true", help="Invia email solo ai destinatari di test")
+    result.add_argument("--recipient", type=str, help="Invia email solo all'indirizzo specificato")
     return result
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
-        detail = run(args.config, dry_run=args.dry_run, saved_export=args.saved_export, only=args.only)
+        detail = run(
+            args.config,
+            dry_run=args.dry_run,
+            saved_export=args.saved_export,
+            only=args.only,
+            test_mode=True if args.test or args.recipient else None,
+            recipient=args.recipient,
+        )
         print(json.dumps(detail, indent=2))
         return 0
     except (ArgoError, ConfigurationError, OSError, RuntimeError, ValueError) as exc:
